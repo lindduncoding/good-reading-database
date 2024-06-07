@@ -3,10 +3,6 @@ from app import app
 from app.db import get_db
 import psycopg2
 
-from flask import request, jsonify, abort
-from app import app
-from app.db import get_db
-
 @app.route('/search_books', methods=['GET'])
 def search_books():
     search_term = request.args.get('search_term')
@@ -52,67 +48,76 @@ def get_manager_branch_info():
     db = get_db()
     cur = db.cursor()
 
-
-    cur.execute("""
-        SELECT m.ManagerID, m.Fname, m.LName, b.BranchNo, l.Street, l.District, c.City, c.Province
-        FROM Manager m
-        JOIN Branch b ON m.ManagerID = b.ManagerID
-        JOIN Locations l ON b.LocationID = l.LocationID
-        JOIN City c ON l.CityID = c.CityID
-    """)
+    try:
+        cur.execute("""
+            SELECT m.ManagerID, m.Fname, m.LName, b.BranchNo, l.Street, l.District, c.City, c.Province
+            FROM Manager m
+            JOIN Branch b ON m.ManagerID = b.ManagerID
+            JOIN Locations l ON b.LocationID = l.LocationID
+            JOIN City c ON l.CityID = c.CityID
+        """)
         
-    manager_branch_info = cur.fetchall()
+        manager_branch_info = cur.fetchall()
 
-    # Format the results
-    formatted_data = [{
-        'ManagerID': item[0],
-        'FirstName': item[1],
-        'LastName': item[2],
-        'BranchNo': item[3],
-        'Street': item[4],
-        'District': item[5],
-        'City': item[6],
-        'Province': item[7]
-    } for item in manager_branch_info]
+        formatted_data = [{
+            'ManagerID': item[0],
+            'FirstName': item[1],
+            'LastName': item[2],
+            'BranchNo': item[3],
+            'Street': item[4],
+            'District': item[5],
+            'City': item[6],
+            'Province': item[7]
+        } for item in manager_branch_info]
 
-    cur.close()
-    return jsonify(formatted_data), 200
+        cur.close()
+        return jsonify(formatted_data), 200
+
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/branch/revenue', methods=['GET'])
 def get_branch_revenue():
     db = get_db()
     cur = db.cursor()
 
+    try:
+        cur.execute("SELECT * FROM BranchRevenue")
+        branch_revenue = cur.fetchall()
 
-    cur.execute("SELECT * FROM BranchRevenue")
-    branch_revenue = cur.fetchall()
+        branch_revenue_data = [{
+            'branch_no': item[0],
+            'total_revenue': item[1]
+        } for item in branch_revenue]
 
-    # Format the results
-    branch_revenue_data = [{
-        'branch_no': item[0],
-        'total_revenue': item[1]
-    } for item in branch_revenue]
+        cur.close()
+        return jsonify(branch_revenue_data), 200
 
-    cur.close()
-    return jsonify(branch_revenue_data), 200
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/branch/stock', methods=['GET'])
 def get_branch_stock():
     db = get_db()
     cur = db.cursor()
 
+    try:
+        cur.execute("SELECT * FROM BranchBookStock")
+        branch_stock = cur.fetchall()
 
-    cur.execute("SELECT * FROM BranchBookStock")
-    branch_revenue = cur.fetchall()
+        branch_stock_data = [{
+            'branch_no': item[0],
+            'total_stock': item[1]
+        } for item in branch_stock]
 
-    # Format the results
-    branch_revenue_data = [{
-        'branch_no': item[0],
-        'total_stock': item[1]
-    } for item in branch_revenue]
+        cur.close()
+        return jsonify(branch_stock_data), 200
 
-    cur.close()
-    return jsonify(branch_revenue_data), 200
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/user/<int:user_id>', methods=['PUT'])
 def change_password(user_id):
@@ -120,19 +125,31 @@ def change_password(user_id):
     new_pass = data['new_pass']
     db = get_db()
     cur = db.cursor()
-    cur.execute("UPDATE users SET user_password = %s WHERE userid = %s", (new_pass, user_id))
-    db.commit()
-    cur.close()
-    return jsonify({'id': user_id, 'password': new_pass})
+
+    try:
+        cur.execute("UPDATE users SET user_password = %s WHERE userid = %s", (new_pass, user_id))
+        db.commit()
+        cur.close()
+        return jsonify({'id': user_id, 'password': new_pass}), 200
+
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/user/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
     db = get_db()
     cur = db.cursor()
-    cur.execute("DELETE FROM users WHERE userid = %s", (user_id,))
-    db.commit()
-    cur.close()
-    return '', 204
+
+    try:
+        cur.execute("DELETE FROM users WHERE userid = %s", (user_id,))
+        db.commit()
+        cur.close()
+        return '', 204
+
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/wishlist', methods=['POST'])
 def add_wishlist():
@@ -141,11 +158,17 @@ def add_wishlist():
     isbn = data['isbn']
     db = get_db()
     cur = db.cursor()
-    cur.execute("INSERT INTO wishlist (userid, isbn) VALUES (%s, %s) RETURNING wishid", (user_id, isbn))
-    wish_id = cur.fetchone()[0]
-    db.commit()
-    cur.close()
-    return jsonify({'id': wish_id, 'user_id': user_id, 'isbn': isbn}), 201
+
+    try:
+        cur.execute("INSERT INTO wishlist (userid, isbn) VALUES (%s, %s) RETURNING wishid", (user_id, isbn))
+        wish_id = cur.fetchone()[0]
+        db.commit()
+        cur.close()
+        return jsonify({'id': wish_id, 'user_id': user_id, 'isbn': isbn}), 201
+
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/wishlist/<int:user_id>', methods=['PUT'])
 def change_wishlist(user_id):
@@ -153,10 +176,16 @@ def change_wishlist(user_id):
     isbn = data['isbn']
     db = get_db()
     cur = db.cursor()
-    cur.execute("UPDATE wishlist SET isbn = %s WHERE userid = %s", (isbn, user_id))
-    db.commit()
-    cur.close()
-    return jsonify({'user_id': user_id, 'isbn': isbn})
+
+    try:
+        cur.execute("UPDATE wishlist SET isbn = %s WHERE userid = %s", (isbn, user_id))
+        db.commit()
+        cur.close()
+        return jsonify({'user_id': user_id, 'isbn': isbn}), 200
+
+    except Exception as e:
+        cur.close()
+        return jsonify({'error': str(e)}), 400
 
 @app.route('/order', methods=['POST'])
 def make_order():
